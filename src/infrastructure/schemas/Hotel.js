@@ -34,7 +34,9 @@ const hotelSchema = new mongoose.Schema({
     }
 });
 
-// Create a model based on the schema
-const Hotel = mongoose.model("Hotel", hotelSchema);
+// Create a model based on the schema and export it
+export default mongoose.model("Hotel", hotelSchema);
 
-export default Hotel;
+
+// const Hotel = mongoose.model("Hotel", hotelSchema);
+// export default Hotel;

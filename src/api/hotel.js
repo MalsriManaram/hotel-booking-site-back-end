@@ -4,10 +4,14 @@ import { getAllHotels, getHotelById, createHotel, deleteHotel, updateHotel } fro
 const hotelsRouter = express.Router();
 
 
-
+// Create the routes
 hotelsRouter.route("/").get(getAllHotels).post(createHotel);
 hotelsRouter.route("/:id").get(getHotelById).delete(deleteHotel).put(updateHotel);
     
+// Export the routerq
+export default hotelsRouter;
+
+
 
 // // Get all hotels route
 // hotelsRouter.get("/", getAllHotels);
@@ -24,5 +28,3 @@ hotelsRouter.route("/:id").get(getHotelById).delete(deleteHotel).put(updateHotel
 // // Update a hotel route
 // hotelsRouter.put("/:id", updateHotel);
 
-
-export default hotelsRouter;
