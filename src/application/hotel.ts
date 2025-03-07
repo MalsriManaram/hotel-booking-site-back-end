@@ -1,80 +1,99 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import Hotel from "./../infrastructure/schemas/Hotel";
+import NotFoundError from "../domain/not-found-error";
+import ValidationError from "../domain/validation-error";
 
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Get all hotels logic
-export const getAllHotels = async (req: Request, res: Response) => {
-    const hotels =  await Hotel.find();
-    res.status(200).json(hotels);
-    return;
+export const getAllHotels = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const hotels =  await Hotel.find();
+      res.status(200).json(hotels);
+      return;
+
+    } catch (error) {
+      next(error);
+    }
 }
 
 // Get a specific hotel logic
-export const getHotelById = async (req: Request, res: Response) => {
-    const hotelId = req.params.id;
-    const hotel = await Hotel.findById(hotelId);
+export const getHotelById = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const hotelId = req.params.id;
+      const hotel = await Hotel.findById(hotelId);
+  
+      // Validate the request
+      if(!hotel){
+        throw new NotFoundError("Hotel not found");
+      }
+      res.status(200).json(hotel);
+      return;
 
-    // Validate the request
-    if(!hotel){
-        res.status(404).send();
-        return;
+    } catch (error) {
+      next(error);
     }
-    res.status(200).json(hotel);
-    return;
 }
 
 // Add a new hotel logic
-export const createHotel = async (req: Request, res: Response) => {
-    const hotel = req.body;
+export const createHotel = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const hotel = req.body;
   
-    // Validate the request data
-    if (
-      !hotel.name ||
-      !hotel.location ||
-      !hotel.rating ||
-      !hotel.reviews ||
-      !hotel.image ||
-      !hotel.price ||
-      !hotel.description
-    ) {
-      res.status(400).json({
-        message: "Please enter all required fields",
+      // Validate the request data
+      if (
+        !hotel.name ||
+        !hotel.location ||
+        !hotel.rating ||
+        !hotel.reviews ||
+        !hotel.image ||
+        !hotel.price ||
+        !hotel.description
+      ) {
+       throw new ValidationError("Invalid hotel data");
+      }
+    
+      // Add the hotel
+      await Hotel.create({
+        name: hotel.name,
+        location: hotel.location,
+        rating: parseFloat(hotel.rating),
+        reviews: parseInt(hotel.reviews),
+        image: hotel.image,
+        price: parseInt(hotel.price),
+        description: hotel.description,
       });
+    
+      // Return the response
+      res.status(201).send();
       return;
+      
+    } catch (error) {
+      next(error);
     }
-  
-    // Add the hotel
-    await Hotel.create({
-      name: hotel.name,
-      location: hotel.location,
-      rating: parseFloat(hotel.rating),
-      reviews: parseInt(hotel.reviews),
-      image: hotel.image,
-      price: parseInt(hotel.price),
-      description: hotel.description,
-    });
-  
-    // Return the response
-    res.status(201).send();
-    return;
   };
 
 // Delete a hotel logic
-export const deleteHotel = async (req: Request, res: Response) => {
-    const hotelId = req.params.id;
+export const deleteHotel = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const hotelId = req.params.id;
 
-    // Delete the hotel
-    await Hotel.findByIdAndDelete(hotelId);
+      // Delete the hotel
+      await Hotel.findByIdAndDelete(hotelId);
+  
+      // Return the response
+      res.status(200).send();
+      return;
 
-    // Return the response
-    res.status(200).send();
-    return;
+    } catch (error) {
+      next(error);
+    }
 };
 
 // Update a hotel logic
-export const updateHotel = async (req: Request, res: Response) => {
+export const updateHotel = async (req: Request, res: Response, next: NextFunction) => {
+   try {
     const hotelId = req.params.id;
     const updatedHotel = req.body;
 
@@ -88,8 +107,7 @@ export const updateHotel = async (req: Request, res: Response) => {
         !updatedHotel.price ||
         !updatedHotel.description
     ) {
-        res.status(400).send();
-        return;
+       throw new ValidationError("Invalid hotel data");
     }
 
     // Update the hotel
@@ -98,4 +116,8 @@ export const updateHotel = async (req: Request, res: Response) => {
     // Return the response
     res.status(200).send();
     return;
+    
+   } catch (error) {
+    next(error);
+   }
 };

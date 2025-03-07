@@ -7,6 +7,7 @@ import cors from "cors";
 import hotelsRouter from './api/hotel';
 import userRouter from "./api/user";
 import bookingRouter from "./api/booking";
+import GlobalErrorHandlingMiddleware from "./api/middlewares/global-error-handling-middleware";
 
 // Create an Express instance
 const app = express();
@@ -29,7 +30,8 @@ app.use("/api/users/", userRouter);
 app.use("/api/bookings/", bookingRouter);
 
 
-
+// post-middleware for error handling
+app.use(GlobalErrorHandlingMiddleware);
 
 // Define the port to run the server
 const PORT = 8000;
