@@ -1,7 +1,8 @@
-import Booking from "../infrastructure/schemas/Booking.js";
+import { Request, Response } from "express";
+import Booking from "./../infrastructure/schemas/Booking";
 
 // Create a booking
-export const createBooking = async (req, res) => {
+export const createBooking = async (req: Request, res: Response) => {
   const booking = req.body;
 
   // Validate the request data
@@ -25,14 +26,14 @@ export const createBooking = async (req, res) => {
 };  
 
 // Get all bookings
-export const getAllBookings = async (req, res) => {
+export const getAllBookings = async (req: Request, res: Response) => {
   const bookings = await Booking.find();
   res.status(200).json({bookings});
   return;
 };
 
 // Get all bookings for a one hotel
-export const getAllBookingsForHotel = async (req, res) => {
+export const getAllBookingsForHotel = async (req: Request, res: Response) => {
   const hotelId = req.params.hotelId;
   const bookings = await Booking.find({hotelId}).populate("hotelId").populate("userId"); 
   res.status(200).json(
@@ -48,7 +49,7 @@ export const getAllBookingsForHotel = async (req, res) => {
 
 
 // // Delete a booking
-// export const deleteBooking = async (req, res) => {
+// export const deleteBooking = async (req: Request, res: Response) => {
 //   const bookingId = req.params.id;
 
 //   // Delete the booking

@@ -1,5 +1,5 @@
 import express from "express";
-import { createBooking, getAllBookingsForHotel, getAllBookings } from "../application/booking.js";
+import { createBooking, getAllBookingsForHotel, getAllBookings } from "./../application/booking";
 
 
 

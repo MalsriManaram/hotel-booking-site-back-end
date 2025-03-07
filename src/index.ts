@@ -1,12 +1,12 @@
 import express from "express";
 import "dotenv/config";
-import connectDB from "./infrastructure/db.js";
+import connectDB from "./infrastructure/db";
 import cors from "cors";
 
 // Import the routers
-import hotelsRouter from './api/hotel.js';
-import userRouter from "./api/user.js";
-import bookingRouter from "./api/booking.js";
+import hotelsRouter from './api/hotel';
+import userRouter from "./api/user";
+import bookingRouter from "./api/booking";
 
 // Create an Express instance
 const app = express();
@@ -18,6 +18,8 @@ app.use(cors());
 
 // Connect to the database
 connectDB();
+
+
 
 // Use the hotels router for all routes starting with /api/hotels
 app.use("/api/hotels/", hotelsRouter);
@@ -31,7 +33,7 @@ app.use("/api/bookings/", bookingRouter);
 
 // Define the port to run the server
 const PORT = 8000;
-app.listen(PORT, console.log(`Server is running on port ${PORT}...`));
+app.listen(PORT, () => console.log(`Server is running on port ${PORT}...`));
 
 
 
