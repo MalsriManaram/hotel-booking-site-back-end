@@ -30,8 +30,8 @@ app.use("/api/users/", userRouter);
 app.use("/api/bookings/", bookingRouter);
 
 
-// post-middleware for error handling
-app.use(GlobalErrorHandlingMiddleware);
+    // post-middleware for error handling
+    app.use(GlobalErrorHandlingMiddleware);
 
 // Define the port to run the server
 const PORT = 8000;

@@ -45,8 +45,6 @@ export const createHotel = async (req: Request, res: Response, next: NextFunctio
       if (
         !hotel.name ||
         !hotel.location ||
-        !hotel.rating ||
-        !hotel.reviews ||
         !hotel.image ||
         !hotel.price ||
         !hotel.description
@@ -58,8 +56,8 @@ export const createHotel = async (req: Request, res: Response, next: NextFunctio
       await Hotel.create({
         name: hotel.name,
         location: hotel.location,
-        rating: parseFloat(hotel.rating),
-        reviews: parseInt(hotel.reviews),
+        // rating: parseFloat(hotel.rating),
+        // reviews: parseInt(hotel.reviews),
         image: hotel.image,
         price: parseInt(hotel.price),
         description: hotel.description,
@@ -101,8 +99,6 @@ export const updateHotel = async (req: Request, res: Response, next: NextFunctio
     if (
         !updatedHotel.name ||
         !updatedHotel.location ||
-        !updatedHotel.rating ||
-        !updatedHotel.reviews ||
         !updatedHotel.image ||
         !updatedHotel.price ||
         !updatedHotel.description
