@@ -7,9 +7,8 @@ const bookingSchema = new mongoose.Schema({
         ref: "Hotel", // get the hotel id from the Hotel schema
     },
     userId: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: String,
         required: true,
-        ref: "User", // get the user id from the User schema
     },
     checkIn: {
         type: Date,

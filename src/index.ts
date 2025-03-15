@@ -1,37 +1,37 @@
 import express from "express";
 import "dotenv/config";
 import connectDB from "./infrastructure/db";
-import cors from "cors";
+
+
+// Import the middlewares
+import GlobalErrorHandlingMiddleware from "./api/middlewares/global-error-handling-middleware"; // Import the GlobalErrorHandlingMiddleware for error handling
+import cors from "cors"; // Import the cors middleware to allow cross-origin requests
+import { clerkMiddleware } from "@clerk/express"; // Import the clerkMiddleware to authenticate the user
 
 // Import the routers
 import hotelsRouter from './api/hotel';
-import userRouter from "./api/user";
 import bookingRouter from "./api/booking";
-import GlobalErrorHandlingMiddleware from "./api/middlewares/global-error-handling-middleware";
+
 
 // Create an Express instance
 const app = express();
 
-// Middleware to parse JSON data in the request body
-app.use(express.json());
-// Middleware to allow cross-origin requests
-app.use(cors());
+//use pre-middleware
+app.use(clerkMiddleware()); // clerkMiddleware to authenticate the user
+app.use(express.json()); // Middleware to parse JSON data in the request body
+app.use(cors()); // Middleware to allow cross-origin requests
 
-// Connect to the database
-connectDB();
-
+connectDB(); // Connect to the database
 
 
-// Use the hotels router for all routes starting with /api/hotels
-app.use("/api/hotels/", hotelsRouter);
-// Use the user router for all routes starting with /api/users
-app.use("/api/users/", userRouter);
-// Use the booking router for all routes starting with /api/bookings
-app.use("/api/bookings/", bookingRouter);
 
 
-    // post-middleware for error handling
-    app.use(GlobalErrorHandlingMiddleware);
+app.use("/api/hotels/", hotelsRouter); // Use the hotels router for all routes starting with /api/hotels
+app.use("/api/bookings/", bookingRouter); // Use the booking router for all routes starting with /api/bookings
+
+
+// use post-middleware
+app.use(GlobalErrorHandlingMiddleware); // post-middleware for error handling
 
 // Define the port to run the server
 const PORT = 8000;

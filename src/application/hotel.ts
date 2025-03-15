@@ -1,7 +1,8 @@
 import { NextFunction, Request, Response } from "express";
 import Hotel from "./../infrastructure/schemas/Hotel";
-import NotFoundError from "../domain/not-found-error";
-import ValidationError from "../domain/validation-error";
+import NotFoundError from "../domain/errors/not-found-error";
+import ValidationError from "../domain/errors/validation-error";
+import { CreateHotelDTO } from "../domain/dtos/hotel";
 
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -39,28 +40,20 @@ export const getHotelById = async (req: Request, res: Response, next: NextFuncti
 // Add a new hotel logic
 export const createHotel = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const hotel = req.body;
+      const hotel = CreateHotelDTO.safeParse(req.body);
   
       // Validate the request data
-      if (
-        !hotel.name ||
-        !hotel.location ||
-        !hotel.image ||
-        !hotel.price ||
-        !hotel.description
-      ) {
-       throw new ValidationError("Invalid hotel data");
+      if (!hotel.success) {
+        throw new ValidationError(hotel.error.message);
       }
     
       // Add the hotel
       await Hotel.create({
-        name: hotel.name,
-        location: hotel.location,
-        // rating: parseFloat(hotel.rating),
-        // reviews: parseInt(hotel.reviews),
-        image: hotel.image,
-        price: parseInt(hotel.price),
-        description: hotel.description,
+        name: hotel.data.name,
+        location: hotel.data.location,
+        image: hotel.data.image,
+        price: parseInt(hotel.data.price),
+        description: hotel.data.description,
       });
     
       // Return the response
