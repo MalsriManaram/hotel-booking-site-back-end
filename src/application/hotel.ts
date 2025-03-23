@@ -3,6 +3,8 @@ import Hotel from "./../infrastructure/schemas/Hotel";
 import NotFoundError from "../domain/errors/not-found-error";
 import ValidationError from "../domain/errors/validation-error";
 import { CreateHotelDTO } from "../domain/dtos/hotel";
+import OpenAI from "openai";
+
 
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -36,6 +38,37 @@ export const getHotelById = async (req: Request, res: Response, next: NextFuncti
       next(error);
     }
 }
+
+//  get a response from chatGPT.  
+export const genarateResponse = async (req: Request, res: Response, next: NextFunction) =>{
+    const { messages } = req.body;
+
+    const client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o",
+      messages: messages.length === 1 ? 
+                [ 
+                  {
+                    role: "system", 
+                    content: "you are a assistant that work as a receptionist in a hotel and you are going to talk to users and help them find the right entertainment options."
+                  },
+                    ...messages,
+                ]
+              : messages,
+      store: true,
+  });
+
+  // console.log(completion.choices[0].message);
+  res.status(200).json({
+    message: [
+    ...messages,
+    { role: "assistant", content: completion.choices[0].message.content},
+  ] 
+  });
+};
 
 // Add a new hotel logic
 export const createHotel = async (req: Request, res: Response, next: NextFunction) => {
