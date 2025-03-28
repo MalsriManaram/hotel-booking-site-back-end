@@ -16,14 +16,21 @@ export const createBooking = async (req: Request, res: Response, next: NextFunct
 
     // Get the user from the request
     const user = req.auth;
-
     // Add the booking
     await Booking.create({
       hotelId: booking.data.hotelId,
-      userId: user.data.userId,
-      checkIn: booking.data.checkIn,
-      checkOut: booking.data.checkOut,
-      roomNumber: booking.data.roomNumber,
+      userId: user.userId,
+      firstName: booking.data.firstName,
+      lastName: booking.data.lastName,
+      email: booking.data.email,
+      phone: booking.data.phone,
+      arrivalDate: booking.data.arrivalDate,
+      departureDate: booking.data.departureDate,
+      roomType: booking.data.roomType,
+      adults: booking.data.adults,
+      children: booking.data.children,
+      specialRequests: booking.data.specialRequests,
+      payment: booking.data.payment,
     });
 
     // Return the response
@@ -41,7 +48,7 @@ export const getAllBookingsForHotel = async ( req: Request, res: Response, next:
     const bookings = await Booking.find({ hotelId: hotelId });
     const bookingsWithUser = await Promise.all(bookings.map(async (el) => {
       const user = await clerkClient.users.getUser(el.userId);
-      return { _id: el._id, hotelId: el.hotelId, checkIn: el.checkIn, checkOut: el.checkOut, roomNumber: el.roomNumber, user: { id: user.id, firstName: user.firstName, lastName: user.lastName } }
+      return { _id: el._id, hotelId: el.hotelId, email: el.email, phone: el.phone, arrivalDate: el.arrivalDate, departureDate: el.departureDate, roomType: el.roomType, adults: el.adults, children: el.children, specialRequests: el.specialRequests, payment: el.payment, user: { id: user.id, firstName: user.firstName, lastName: user.lastName } }
     }))
 
     res.status(200).json(bookingsWithUser);
