@@ -19,9 +19,9 @@ const app = express();
 //use pre-middleware
 app.use(clerkMiddleware()); // clerkMiddleware to authenticate the user
 app.use(express.json()); // Middleware to parse JSON data in the request body
-app.use(cors()); // Middleware to allow cross-origin requests
+app.use(cors({ origin: "https://staylux-hotel-booking-system-malsri.netlify.app" })); // Middleware to allow cross-origin requests
 
-connectDB(); // Connect to the database
+
 
 
 
@@ -32,10 +32,11 @@ app.use("/api/bookings/", bookingRouter); // Use the booking router for all rout
 
 // use post-middleware
 app.use(GlobalErrorHandlingMiddleware); // post-middleware for error handling
+connectDB(); // Connect to the database
 
 // Define the port to run the server
-const PORT = 8000;
-app.listen(PORT, () => console.log(`Server is running on port ${PORT}...`));
+const PORT = process.env.PORT || 8000;
+app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
 
 
 

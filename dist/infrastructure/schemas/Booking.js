@@ -1,7 +1,12 @@
-import mongoose from "mongoose";
-const bookingSchema = new mongoose.Schema({
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const mongoose_1 = __importDefault(require("mongoose"));
+const bookingSchema = new mongoose_1.default.Schema({
     hotelId: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: mongoose_1.default.Schema.Types.ObjectId,
         required: true,
         ref: "Hotel",
     },
@@ -58,5 +63,4 @@ const bookingSchema = new mongoose.Schema({
         required: true,
     },
 }, { timestamps: true });
-
-export default mongoose.model("Booking", bookingSchema);
+exports.default = mongoose_1.default.model("Booking", bookingSchema);
