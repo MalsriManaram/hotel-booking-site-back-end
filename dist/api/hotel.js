@@ -17,13 +17,3 @@ hotelsRouter.route("/embeddings/create").post(embedding_1.createEmbeddings);
 hotelsRouter.route("/search/retrieve").get(retrieve_1.retrieve);
 // Export the router
 exports.default = hotelsRouter;
-// // Get all hotels route
-// hotelsRouter.get("/", getAllHotels);
-// // Get a specific hotel route
-// hotelsRouter.get("/:id", getHotelById);
-// // Add a new hotel route
-// hotelsRouter.post("/", createHotel);
-// // Delete a hotel route
-// hotelsRouter.delete("/:id", deleteHotel);
-// // Update a hotel route
-// hotelsRouter.put("/:id", updateHotel);
