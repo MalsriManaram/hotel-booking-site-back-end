@@ -3,7 +3,7 @@ import ForbiddenError from "../../domain/errors/forbidden-error";
 
 
 export const isAuthenticated = (req: Request, res: Response, next: NextFunction) => {
-    if (!req?.auth.userId) {
+    if (!(req as any)?.auth.userId) {
         throw new ForbiddenError("Unauthorized");
 
     }

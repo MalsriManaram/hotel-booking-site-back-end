@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import Booking from "../infrastructure/schemas/Booking";
 import { CreateBookingDTO } from "../domain/dtos/booking";
 import ValidationError from "../domain/errors/validation-error";
+import NotFoundError from "../domain/errors/not-found-error";
 import { clerkClient } from "@clerk/express";
 
 // Create a booking
@@ -15,7 +16,8 @@ export const createBooking = async (req: Request, res: Response, next: NextFunct
     }
 
     // Get the user from the request
-    const user = req.auth;
+    const user = (req as any).auth;
+    
     // Add the booking
     await Booking.create({
       hotelId: booking.data.hotelId,
@@ -31,6 +33,7 @@ export const createBooking = async (req: Request, res: Response, next: NextFunct
       children: booking.data.children,
       specialRequests: booking.data.specialRequests,
       payment: booking.data.payment,
+      status: "Ongoing", 
     });
 
     // Return the response
@@ -39,24 +42,72 @@ export const createBooking = async (req: Request, res: Response, next: NextFunct
     next(error);
   }
 };
-
-
-// Get all bookings for a one hotel
-export const getAllBookingsForHotel = async ( req: Request, res: Response, next: NextFunction ) => {
+// Get all bookings for a specific hotel
+export const getBookingsbyHotelId = async ( req: Request, res: Response, next: NextFunction ) => {
   try {
-    const hotelId = req.params.hotelId;
-    const bookings = await Booking.find({ hotelId: hotelId });
-    const bookingsWithUser = await Promise.all(bookings.map(async (el) => {
-      const user = await clerkClient.users.getUser(el.userId);
-      return { _id: el._id, hotelId: el.hotelId, email: el.email, phone: el.phone, arrivalDate: el.arrivalDate, departureDate: el.departureDate, roomType: el.roomType, adults: el.adults, children: el.children, specialRequests: el.specialRequests, payment: el.payment, user: { id: user.id, firstName: user.firstName, lastName: user.lastName } }
-    }))
+    const { id } = req.params;
+    
+    // Fetch all the bookings for the a specific hotel from the database
+    const bookings = await Booking.find({ hotelId: id });
 
-    res.status(200).json(bookingsWithUser);
+    // Send the bookings data
+    res.json({ bookings });
     return;
+
   } catch (error) {
     next(error);
   }
 };
+
+
+// Get all hotels for a specific user
+export const getBookingsbyUserId = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    // Fetch bookings for the user and populate the hotel data completely
+    const bookings = await Booking.find({ userId: id }).populate({
+      path: "hotelId", 
+      model: "Hotel"   
+    });
+
+    // If no bookings are found
+    if (!bookings || bookings.length === 0) {
+      throw new NotFoundError("No bookings found for this user");
+    }
+    // Send the bookings data
+    res.json({ bookings });
+    return;
+
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Cancel a booking
+export const cancelBooking = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+      const { bookingId, userId } = req.body;
+
+      const booking = await Booking.findOne({ _id: bookingId, userId });
+
+      if (!booking) {
+          throw new NotFoundError("Booking not found or does not belong to the user");
+      }
+
+      if (booking.status === "Canceled") {
+          throw new NotFoundError("Booking is already canceled");
+      }
+
+      booking.status = "Canceled";
+      await booking.save();
+
+      res.status(200).json({ message: "Booking successfully canceled" });
+  } catch (error) {
+      next(error);
+  }
+};
+
 
 // Get all bookings
 export const getAllBookings = async ( req: Request, res: Response, next: NextFunction ) => {
@@ -69,19 +120,3 @@ export const getAllBookings = async ( req: Request, res: Response, next: NextFun
     next(error);
   }
 };
-
-
-// // Delete a booking
-// export const deleteBooking = async (req: Request, res: Response, next: NextFunction) => {
-//   try {
-//     const bookingId = req.params.id;
-
-//     // Delete the booking
-//     await Booking.findByIdAndDelete(bookingId);
-
-//     // Return the response
-//     res.status(200).send();
-//   } catch (error) {
-//     next(error);
-//   }
-// };

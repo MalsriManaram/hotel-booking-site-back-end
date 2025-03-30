@@ -3,7 +3,7 @@ import UnauthorizedError  from "../../domain/errors/unauthorized-error";
 
 
 export const isAdmin = (req: Request, res: Response, next: NextFunction) => {
-    if (!(req?.auth?.sessionClaims?.role !== "admin")) {
+    if (!((req as any)?.auth?.sessionClaims?.role !== "admin")) {
         throw new UnauthorizedError("Forbidden");
 
     }
