@@ -19,9 +19,9 @@ export const createEmbeddings = async ( req: Request, res: Response, next: NextF
     const hotels = await Hotel.find({});
 
     const docs = hotels.map((hotel) => {
-      const { _id, location, price, description } = hotel;
+      const { _id, rating, location, price, description } = hotel;
       const doc = new Document({
-        pageContent: `${description} Located in ${location}. Price per night: ${price}`,
+        pageContent: `Hotel Rating: ${rating} .${description} Located in ${location}. Price per night: ${price}`,
         metadata: {
           _id,
         },

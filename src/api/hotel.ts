@@ -10,6 +10,7 @@ const hotelsRouter = express.Router();
 
 // Create the routes
 hotelsRouter.route("/").get(getAllHotels).post( isAuthenticated, isAdmin, createHotel);
+hotelsRouter.route("/generate-response").post(genarateResponse);
 hotelsRouter.route("/:id").get(getHotelById).delete(deleteHotel).put(updateHotel);
 
 hotelsRouter.route("/embeddings/create").post(createEmbeddings);
