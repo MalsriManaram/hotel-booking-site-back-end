@@ -5,11 +5,6 @@ import { HuggingFaceInferenceEmbeddings } from "@langchain/community/embeddings/
 import { MongoDBAtlasVectorSearch } from "@langchain/mongodb";
 
 
-if(!process.env.HUGGINGFACE_API_KEY){
-  throw new Error("HUGGINGFACE_API_KEY is not defined in environment variables");
-}
-
-
 export const retrieve = async (
   req: Request,
   res: Response,

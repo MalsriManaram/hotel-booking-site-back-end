@@ -13,26 +13,28 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createEmbeddings = void 0;
-const openai_1 = require("@langchain/openai");
+const hf_1 = require("@langchain/community/embeddings/hf");
 const documents_1 = require("@langchain/core/documents");
 const mongodb_1 = require("@langchain/mongodb");
 const mongoose_1 = __importDefault(require("mongoose"));
 const Hotel_1 = __importDefault(require("../infrastructure/schemas/Hotel"));
 const createEmbeddings = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
-        const embeddingsModel = new openai_1.OpenAIEmbeddings({
-            model: "text-embedding-ada-002",
-            apiKey: process.env.OPENAI_API_KEY,
+        // Hugging Face Inference Embeddings
+        const embeddingsModel = new hf_1.HuggingFaceInferenceEmbeddings({
+            model: "sentence-transformers/all-MiniLM-L6-v2",
+            apiKey: process.env.HUGGINGFACE_API_KEY,
         });
         const vectorIndex = new mongodb_1.MongoDBAtlasVectorSearch(embeddingsModel, {
-            collection: mongoose_1.default.connection.collection("hotelVectors"),
+            collection: (_a = mongoose_1.default.connection.db) === null || _a === void 0 ? void 0 : _a.collection("hotelVectors"),
             indexName: "vector_index",
         });
         const hotels = yield Hotel_1.default.find({});
         const docs = hotels.map((hotel) => {
-            const { _id, location, price, description } = hotel;
+            const { _id, rating, location, price, description } = hotel;
             const doc = new documents_1.Document({
-                pageContent: `${description} Located in ${location}. Price per night: ${price}`,
+                pageContent: `Hotel Rating: ${rating} .${description} Located in ${location}. Price per night: ${price}`,
                 metadata: {
                     _id,
                 },

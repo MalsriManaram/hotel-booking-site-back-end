@@ -14,14 +14,19 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.retrieve = void 0;
 const Hotel_1 = __importDefault(require("../infrastructure/schemas/Hotel"));
-const openai_1 = require("@langchain/openai");
-const mongodb_1 = require("@langchain/mongodb");
 const mongoose_1 = __importDefault(require("mongoose"));
+const hf_1 = require("@langchain/community/embeddings/hf");
+const mongodb_1 = require("@langchain/mongodb");
 const retrieve = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         const { description, rating, location, price } = req.query;
+        console.log("Retrieve called with:", { description, rating, location, price });
         // if query is empty, return all hotels
-        if (!description || description === "" && !rating || rating === "" && !location || location === "" && !price || price === "") {
+        if ((!description || description === "") &&
+            (!rating || rating === "") &&
+            (!location || location === "") &&
+            (!price || price === "")) {
             const hotels = (yield Hotel_1.default.find()).map((hotel) => ({
                 hotel: hotel,
                 confidence: 1,
@@ -30,28 +35,20 @@ const retrieve = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
             return;
         }
         // Construct a combined query string
-        const query = [
-            description || "",
-            rating ? `Rating: ${rating}` : "",
-            location ? `Location: ${location}` : "",
-            price ? `Price: ${price}` : "",
-        ]
-            .filter(Boolean)
-            .join(" | ");
-        // Initialize OpenAI embeddings model
-        const embeddingsModel = new openai_1.OpenAIEmbeddings({
-            model: "text-embedding-ada-002",
-            apiKey: process.env.OPENAI_API_KEY,
+        const query = `Hotel Rating: ${rating || "N/A"}, Description: ${description || "N/A"}, Location: ${location || "N/A"}, Price: ${price || "N/A"}`;
+        // Use Hugging Face Inference Embeddings
+        const embeddingsModel = new hf_1.HuggingFaceInferenceEmbeddings({
+            model: "sentence-transformers/all-MiniLM-L6-v2",
+            apiKey: process.env.HUGGINGFACE_API_KEY,
         });
-        // Connect to MongoDB Vector Search
+        // Create vector index
         const vectorIndex = new mongodb_1.MongoDBAtlasVectorSearch(embeddingsModel, {
-            collection: mongoose_1.default.connection.collection("hotelVectors"),
+            collection: (_a = mongoose_1.default.connection.db) === null || _a === void 0 ? void 0 : _a.collection("hotelVectors"),
             indexName: "vector_index",
         });
-        // Perform similarity search using the combined query string
+        // Search for the query
         const results = yield vectorIndex.similaritySearchWithScore(query);
         console.log(results);
-        // Fetch matching hotels from MongoDB
         const matchedHotels = yield Promise.all(results.map((result) => __awaiter(void 0, void 0, void 0, function* () {
             const hotel = yield Hotel_1.default.findById(result[0].metadata._id);
             return {
@@ -59,12 +56,9 @@ const retrieve = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
                 confidence: result[1],
             };
         })));
-        // Check if matchedHotels array is empty
-        if (matchedHotels.length === 0) {
-            res.status(204).send();
-            return;
-        }
-        res.status(200).json(matchedHotels.length > 3 ? matchedHotels.slice(0, 4) : matchedHotels);
+        res
+            .status(200)
+            .json(matchedHotels.length > 3 ? matchedHotels.slice(0, 4) : matchedHotels);
         return;
     }
     catch (error) {
