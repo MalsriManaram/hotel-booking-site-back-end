@@ -13,6 +13,7 @@ const express_2 = require("@clerk/express");
 // Import the routers
 const hotel_1 = __importDefault(require("./api/hotel"));
 const booking_1 = __importDefault(require("./api/booking"));
+const contact_1 = __importDefault(require("./api/contact"));
 // Create an Express instance
 const app = (0, express_1.default)();
 //use pre-middleware
@@ -21,6 +22,7 @@ app.use(express_1.default.json());
 app.use((0, cors_1.default)({ origin: "https://staylux-hotel-booking-system-malsri.netlify.app" })); // Middleware to allow cross-origin requests
 app.use("/api/hotels/", hotel_1.default);
 app.use("/api/bookings/", booking_1.default);
+app.use("/api/contacts/", contact_1.default);
 // use post-middleware
 app.use(global_error_handling_middleware_1.default); // post-middleware for error handling
 (0, db_1.default)();

@@ -21,6 +21,7 @@
     "form-data": "^4.0.2",
     "mongodb": "^7.0.0",
     "mongoose": "^8.13.1",
+    "nodemailer": "^7.0.12",
     "undici-types": "^7.5.0",
     "zod": "^3.24.2"
   },
@@ -30,6 +31,7 @@
     "@types/form-data": "^2.2.1",
     "@types/mongoose": "^5.11.96",
     "@types/node": "^22.13.14",
+    "@types/nodemailer": "^7.0.4",
     "nodemon": "^3.1.9",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.2"

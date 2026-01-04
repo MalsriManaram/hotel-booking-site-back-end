@@ -10,6 +10,7 @@ import { clerkMiddleware } from "@clerk/express";
 // Import the routers
 import hotelsRouter from "./api/hotel";
 import bookingRouter from "./api/booking";
+import contactRouter from "./api/contact";
 
 // Create an Express instance
 const app = express();
@@ -23,6 +24,7 @@ app.use(
 
 app.use("/api/hotels/", hotelsRouter);
 app.use("/api/bookings/", bookingRouter);
+app.use("/api/contacts/", contactRouter);
 
 // use post-middleware
 app.use(GlobalErrorHandlingMiddleware); // post-middleware for error handling
