@@ -313,7 +313,7 @@ const conciergeChat = async (req, res, next) => {
                     res.status(200).json({
                         reply: geminiTurn.reply,
                         interactionId: geminiTurn.interactionId,
-                        provider: gemini_1.GEMINI_CHAT_MODEL,
+                        provider: geminiTurn.modelUsed || gemini_1.GEMINI_CHAT_MODEL,
                         recommendedHotels,
                     });
                     return;

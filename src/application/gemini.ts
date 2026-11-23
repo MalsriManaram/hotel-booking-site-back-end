@@ -1,6 +1,12 @@
 import { GoogleGenAI } from "@google/genai";
 
-export const GEMINI_CHAT_MODEL = "gemini-3.8-flash";
+export const GEMINI_CHAT_MODELS = [
+  "gemini-3.5-flash-lite",
+  "gemini-3.8-flash",
+  "gemini-3.1-flash-lite",
+] as const;
+
+export const GEMINI_CHAT_MODEL = GEMINI_CHAT_MODELS[0];
 export const GEMINI_EMBEDDING_MODEL = "gemini-embedding-001";
 export const GEMINI_EMBEDDING_DIM = 768;
 
@@ -92,14 +98,77 @@ export async function embedDocumentsBatchWithGemini(
   return texts.map((_, idx) => normalizeVectorL2(list[idx]?.values));
 }
 
+async function createInteractionWithFailover(params: {
+  system_instruction: string;
+  input: string;
+  previous_interaction_id?: string;
+  store?: boolean;
+}): Promise<{ text: string; interactionId?: string; modelUsed: string } | null> {
+  const client = getGeminiClient();
+  if (!client) return null;
+
+  const preferred = process.env.GEMINI_MODEL?.trim();
+  const candidates = preferred
+    ? [preferred, ...GEMINI_CHAT_MODELS.filter((m) => m !== preferred)]
+    : [...GEMINI_CHAT_MODELS];
+
+  let lastError: any = null;
+  for (const modelName of candidates) {
+    try {
+      const interaction = await client.interactions.create({
+        model: modelName as any,
+        system_instruction: params.system_instruction,
+        input: params.input,
+        ...(params.store !== undefined ? { store: params.store } : {}),
+        ...(params.previous_interaction_id
+          ? { previous_interaction_id: params.previous_interaction_id }
+          : {}),
+      });
+
+      const text = (interaction.output_text || "").trim();
+      if (text) {
+        return {
+          text,
+          interactionId: interaction.id,
+          modelUsed: modelName,
+        };
+      }
+    } catch (err: any) {
+      lastError = err;
+      // If previous_interaction_id failed on failover or expired (1-day Free Tier TTL), retry stateless once
+      if (params.previous_interaction_id) {
+        try {
+          const retryStateless = await client.interactions.create({
+            model: modelName as any,
+            system_instruction: params.system_instruction,
+            input: params.input,
+          });
+          const retryText = (retryStateless.output_text || "").trim();
+          if (retryText) {
+            return {
+              text: retryText,
+              interactionId: retryStateless.id,
+              modelUsed: modelName,
+            };
+          }
+        } catch (innerErr) {
+          lastError = innerErr;
+        }
+      }
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+  return null;
+}
+
 export async function runGeminiConciergeTurn(params: {
   userMessage: string;
   hotelsCatalogSummary: string;
   previousInteractionId?: string;
-}): Promise<{ reply: string; interactionId?: string } | null> {
-  const client = getGeminiClient();
-  if (!client) return null;
-
+}): Promise<{ reply: string; interactionId?: string; modelUsed: string } | null> {
   // Per Interactions API rules, system_instruction is interaction-scoped and supplied each turn
   const systemInstruction = [
     "You are the official StayLux AI Travel Concierge for a luxury hotel booking platform.",
@@ -112,21 +181,18 @@ export async function runGeminiConciergeTurn(params: {
     params.hotelsCatalogSummary,
   ].join("\n");
 
-  const interaction = await client.interactions.create({
-    model: GEMINI_CHAT_MODEL,
+  const result = await createInteractionWithFailover({
     system_instruction: systemInstruction,
     input: params.userMessage,
-    ...(params.previousInteractionId
-      ? { previous_interaction_id: params.previousInteractionId }
-      : {}),
+    previous_interaction_id: params.previousInteractionId,
   });
 
-  const text = (interaction.output_text || "").trim();
-  if (!text) return null;
+  if (!result) return null;
 
   return {
-    reply: text,
-    interactionId: interaction.id,
+    reply: result.text,
+    interactionId: result.interactionId,
+    modelUsed: result.modelUsed,
   };
 }
 
@@ -141,21 +207,18 @@ export async function summarizeReviewsWithGemini(params: {
   const cached = reviewSummaryCache.get(params.cacheKey);
   if (cached) return cached;
 
-  const client = getGeminiClient();
-  if (!client || !params.reviewsText.trim()) return null;
+  if (!params.reviewsText.trim()) return null;
 
-  const interaction = await client.interactions.create({
-    model: GEMINI_CHAT_MODEL,
+  const result = await createInteractionWithFailover({
     store: false,
     system_instruction:
       "Summarize verified hotel guest reviews in 2 concise, balanced sentences (max 55 words). Highlight what guests loved most and who the hotel is best suited for. Plain text only.",
     input: `Hotel: ${params.hotelName}\nGuest Reviews:\n${params.reviewsText}`,
   });
 
-  const summary = (interaction.output_text || "").trim();
-  if (summary) {
-    reviewSummaryCache.set(params.cacheKey, summary);
-    return summary;
+  if (result?.text) {
+    reviewSummaryCache.set(params.cacheKey, result.text);
+    return result.text;
   }
   return null;
 }

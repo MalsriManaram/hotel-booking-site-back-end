@@ -375,7 +375,7 @@ export const conciergeChat = async (
           res.status(200).json({
             reply: geminiTurn.reply,
             interactionId: geminiTurn.interactionId,
-            provider: GEMINI_CHAT_MODEL,
+            provider: geminiTurn.modelUsed || GEMINI_CHAT_MODEL,
             recommendedHotels,
           });
           return;
