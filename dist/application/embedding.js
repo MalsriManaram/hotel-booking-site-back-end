@@ -1,53 +1,243 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createEmbeddings = void 0;
+exports.buildHotelEmbeddingText = buildHotelEmbeddingText;
+exports.ensureGeminiHotelVectors = ensureGeminiHotelVectors;
+exports.upsertHotelVector = upsertHotelVector;
+exports.removeHotelVector = removeHotelVector;
 const hf_1 = require("@langchain/community/embeddings/hf");
 const documents_1 = require("@langchain/core/documents");
 const mongodb_1 = require("@langchain/mongodb");
 const mongoose_1 = __importDefault(require("mongoose"));
-const Hotel_1 = __importDefault(require("../infrastructure/schemas/Hotel"));
-const createEmbeddings = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const Hotel_1 = __importStar(require("../infrastructure/schemas/Hotel"));
+const gemini_1 = require("./gemini");
+function buildHotelEmbeddingText(hotelObj) {
+    const normalized = (0, Hotel_1.normalizeHotelDoc)(hotelObj);
+    const amenitiesStr = (normalized.amenities || []).join(", ");
+    const tagsStr = (normalized.tags || []).join(", ");
+    return `Hotel Name: ${normalized.name}. Location: ${normalized.location}. Rating: ${normalized.rating || "New"}. Price per night: $${normalized.price}. Tags: ${tagsStr}. Amenities: ${amenitiesStr}. Description: ${normalized.description}`;
+}
+function getGeminiVectorCollection() {
+    return mongoose_1.default.connection.db?.collection("hotelGeminiVectors");
+}
+function getLegacyHfVectorCollection() {
+    return mongoose_1.default.connection.db?.collection("hotelVectors");
+}
+async function ensureGeminiHotelVectors(hotels) {
+    const vectorMap = new Map();
+    if (!(0, gemini_1.isGeminiConfigured)() || hotels.length === 0)
+        return vectorMap;
+    const collection = getGeminiVectorCollection();
+    if (!collection)
+        return vectorMap;
+    const existingDocs = await collection
+        .find({ model: gemini_1.GEMINI_EMBEDDING_MODEL })
+        .toArray();
+    for (const doc of existingDocs) {
+        if (doc.hotelId && Array.isArray(doc.embedding) && doc.embedding.length > 0) {
+            vectorMap.set(String(doc.hotelId), doc.embedding);
+        }
+    }
+    const missingHotels = hotels.filter((h) => !vectorMap.has(String(h._id)));
+    if (missingHotels.length > 0) {
+        const texts = missingHotels.map((h) => buildHotelEmbeddingText(h));
+        const embeddings = await (0, gemini_1.embedDocumentsBatchWithGemini)(texts);
+        const bulkOps = [];
+        missingHotels.forEach((h, idx) => {
+            const vec = embeddings[idx];
+            if (vec && vec.length > 0) {
+                vectorMap.set(String(h._id), vec);
+                bulkOps.push({
+                    updateOne: {
+                        filter: { hotelId: String(h._id) },
+                        update: {
+                            $set: {
+                                hotelId: String(h._id),
+                                embedding: vec,
+                                model: gemini_1.GEMINI_EMBEDDING_MODEL,
+                                updatedAt: new Date(),
+                            },
+                        },
+                        upsert: true,
+                    },
+                });
+            }
+        });
+        if (bulkOps.length > 0) {
+            await collection.bulkWrite(bulkOps);
+        }
+    }
+    return vectorMap;
+}
+async function upsertHotelVector(hotelDoc) {
+    if ((0, gemini_1.isGeminiConfigured)()) {
+        const collection = getGeminiVectorCollection();
+        if (!collection)
+            return false;
+        const text = buildHotelEmbeddingText(hotelDoc);
+        const vec = await (0, gemini_1.embedTextWithGemini)(text, "RETRIEVAL_DOCUMENT", hotelDoc.name);
+        if (!vec)
+            return false;
+        await collection.updateOne({ hotelId: String(hotelDoc._id) }, {
+            $set: {
+                hotelId: String(hotelDoc._id),
+                embedding: vec,
+                model: gemini_1.GEMINI_EMBEDDING_MODEL,
+                updatedAt: new Date(),
+            },
+        }, { upsert: true });
+        return true;
+    }
+    if (!process.env.HUGGINGFACE_API_KEY)
+        return false;
+    const hfCollection = getLegacyHfVectorCollection();
+    if (!hfCollection)
+        return false;
+    const embeddingsModel = new hf_1.HuggingFaceInferenceEmbeddings({
+        model: "sentence-transformers/all-MiniLM-L6-v2",
+        apiKey: process.env.HUGGINGFACE_API_KEY,
+    });
+    await hfCollection.deleteMany({
+        $or: [
+            { "metadata._id": hotelDoc._id },
+            { _id: hotelDoc._id },
+            { "metadata._id": String(hotelDoc._id) },
+        ],
+    });
+    const vectorIndex = new mongodb_1.MongoDBAtlasVectorSearch(embeddingsModel, {
+        collection: hfCollection,
+        indexName: "vector_index",
+    });
+    const doc = new documents_1.Document({
+        pageContent: buildHotelEmbeddingText(hotelDoc),
+        metadata: {
+            _id: hotelDoc._id,
+        },
+    });
+    await vectorIndex.addDocuments([doc]);
+    return true;
+}
+async function removeHotelVector(hotelId) {
+    const geminiCol = getGeminiVectorCollection();
+    if (geminiCol) {
+        await geminiCol.deleteMany({ hotelId: String(hotelId) });
+    }
+    const hfCol = getLegacyHfVectorCollection();
+    if (hfCol) {
+        const filters = [{ "metadata._id": hotelId }];
+        if (mongoose_1.default.Types.ObjectId.isValid(hotelId)) {
+            filters.push({ "metadata._id": new mongoose_1.default.Types.ObjectId(hotelId) });
+        }
+        await hfCol.deleteMany({ $or: filters });
+    }
+}
+const createEmbeddings = async (req, res, next) => {
     try {
-        // Hugging Face Inference Embeddings
+        const hotels = await Hotel_1.default.find({});
+        // Priority 1: Google Gemini API Free Tier (gemini-embedding-001)
+        if ((0, gemini_1.isGeminiConfigured)()) {
+            const collection = getGeminiVectorCollection();
+            if (!collection) {
+                res.status(500).json({ message: "Database vector collection unavailable" });
+                return;
+            }
+            await collection.deleteMany({});
+            const texts = hotels.map((h) => buildHotelEmbeddingText(h));
+            const embeddings = await (0, gemini_1.embedDocumentsBatchWithGemini)(texts);
+            const docsToInsert = hotels
+                .map((h, idx) => embeddings[idx]
+                ? {
+                    hotelId: String(h._id),
+                    embedding: embeddings[idx],
+                    model: gemini_1.GEMINI_EMBEDDING_MODEL,
+                    updatedAt: new Date(),
+                }
+                : null)
+                .filter(Boolean);
+            if (docsToInsert.length > 0) {
+                await collection.insertMany(docsToInsert);
+            }
+            res.status(200).json({
+                message: `Indexed ${docsToInsert.length} hotels with Google Gemini Free Tier (${gemini_1.GEMINI_EMBEDDING_MODEL}).`,
+                indexedCount: docsToInsert.length,
+                mode: "gemini-embedding-001",
+            });
+            return;
+        }
+        // Priority 2: Legacy Hugging Face Inference fallback
+        if (!process.env.HUGGINGFACE_API_KEY) {
+            res.status(200).json({
+                message: "Add GEMINI_API_KEY to .env to enable Google Gemini embeddings (currently using zero-key local semantic fallback).",
+                indexedCount: hotels.length,
+                mode: "local-hybrid",
+            });
+            return;
+        }
+        const hfCollection = getLegacyHfVectorCollection();
+        if (!hfCollection) {
+            res.status(500).json({ message: "Database vector collection unavailable" });
+            return;
+        }
+        await hfCollection.deleteMany({});
         const embeddingsModel = new hf_1.HuggingFaceInferenceEmbeddings({
             model: "sentence-transformers/all-MiniLM-L6-v2",
             apiKey: process.env.HUGGINGFACE_API_KEY,
         });
         const vectorIndex = new mongodb_1.MongoDBAtlasVectorSearch(embeddingsModel, {
-            collection: (_a = mongoose_1.default.connection.db) === null || _a === void 0 ? void 0 : _a.collection("hotelVectors"),
+            collection: hfCollection,
             indexName: "vector_index",
         });
-        const hotels = yield Hotel_1.default.find({});
-        const docs = hotels.map((hotel) => {
-            const { _id, rating, location, price, description } = hotel;
-            const doc = new documents_1.Document({
-                pageContent: `Hotel Rating: ${rating} .${description} Located in ${location}. Price per night: ${price}`,
-                metadata: {
-                    _id,
-                },
-            });
-            return doc;
-        });
-        yield vectorIndex.addDocuments(docs);
+        const docs = hotels.map((hotel) => new documents_1.Document({
+            pageContent: buildHotelEmbeddingText(hotel),
+            metadata: { _id: hotel._id },
+        }));
+        if (docs.length > 0) {
+            await vectorIndex.addDocuments(docs);
+        }
         res.status(200).json({
-            message: "Embeddings created successfully",
+            message: `Synced ${docs.length} hotel embeddings via Hugging Face.`,
+            indexedCount: docs.length,
+            mode: "huggingface-atlas-hybrid",
         });
     }
     catch (error) {
         next(error);
     }
-});
+};
 exports.createEmbeddings = createEmbeddings;

@@ -1,14 +1,14 @@
 import { Request, Response, NextFunction } from "express";
-import ForbiddenError from "../../domain/errors/forbidden-error";
+import UnauthorizedError from "../../domain/errors/unauthorized-error";
 
-
-export const isAuthenticated = (req: Request, res: Response, next: NextFunction) => {
-    if (!(req as any)?.auth.userId) {
-        throw new ForbiddenError("Unauthorized");
-
-    }
-    
-    next();
+export const isAuthenticated = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const userId = (req as any)?.auth?.userId;
+  if (!userId) {
+    return next(new UnauthorizedError("Authentication required"));
+  }
+  next();
 };
-
-// this is the authentication middleware 

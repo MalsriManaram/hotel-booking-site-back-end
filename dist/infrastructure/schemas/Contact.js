@@ -5,9 +5,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importDefault(require("mongoose"));
 const contactSchema = new mongoose_1.default.Schema({
-    name: { type: String, required: true },
-    email: { type: String, required: true },
-    message: { type: String, required: true },
+    name: { type: String, required: true, trim: true },
+    email: { type: String, required: true, trim: true },
+    message: { type: String, required: true, trim: true },
+    status: {
+        type: String,
+        enum: ["unread", "resolved"],
+        default: "unread",
+    },
     createdAt: { type: Date, default: Date.now },
 });
 exports.default = mongoose_1.default.model("Contact", contactSchema);

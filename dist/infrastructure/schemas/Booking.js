@@ -5,6 +5,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importDefault(require("mongoose"));
 const bookingSchema = new mongoose_1.default.Schema({
+    bookingRef: {
+        type: String,
+        index: true,
+    },
     hotelId: {
         type: mongoose_1.default.Schema.Types.ObjectId,
         required: true,
@@ -13,6 +17,7 @@ const bookingSchema = new mongoose_1.default.Schema({
     userId: {
         type: String,
         required: true,
+        index: true,
     },
     firstName: {
         type: String,
@@ -54,9 +59,31 @@ const bookingSchema = new mongoose_1.default.Schema({
         type: String,
         default: "",
     },
+    promoCode: {
+        type: String,
+        default: "",
+    },
+    discountAmount: {
+        type: Number,
+        default: 0,
+    },
     payment: {
         type: String,
         required: true,
+    },
+    paymentMethod: {
+        type: String,
+        enum: ["whatsapp", "pay_at_hotel", "payhere_sandbox"],
+        default: "whatsapp",
+    },
+    paymentStatus: {
+        type: String,
+        enum: ["Pending_WhatsApp", "Pay_At_Hotel", "Paid", "Refunded"],
+        default: "Pending_WhatsApp",
+    },
+    whatsappOrderUrl: {
+        type: String,
+        default: "",
     },
     status: {
         type: String,

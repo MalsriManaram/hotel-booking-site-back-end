@@ -1,19 +1,31 @@
 import express from "express";
-import { createBooking, getBookingsbyUserId, cancelBooking, getBookingsbyHotelId } from "./../application/booking";
+import {
+  createBooking,
+  getBookingsbyUserId,
+  cancelBooking,
+  getBookingsbyHotelId,
+  getAllBookings,
+  updateBookingStatusAdmin,
+  validatePromoEndpoint,
+} from "./../application/booking";
 import { isAuthenticated } from "./middlewares/authentication-middleware";
-
-
+import { isAdmin } from "./middlewares/authorization-middleware";
 
 const bookingRouter = express.Router();
 
-// Create a booking route
-bookingRouter.route("/").post(isAuthenticated, createBooking);
-bookingRouter.route("/cancel/").post(cancelBooking);
-bookingRouter.route("/hotels/:id").get(getBookingsbyHotelId);
-bookingRouter.route("/users/:id").get(getBookingsbyUserId);
+bookingRouter
+  .route("/")
+  .get(isAuthenticated, isAdmin, getAllBookings)
+  .post(isAuthenticated, createBooking);
 
+bookingRouter.route("/promo/validate").post(validatePromoEndpoint);
+bookingRouter.route("/cancel").post(isAuthenticated, cancelBooking);
+bookingRouter
+  .route("/hotels/:id")
+  .get(isAuthenticated, isAdmin, getBookingsbyHotelId);
+bookingRouter.route("/users/:id").get(isAuthenticated, getBookingsbyUserId);
+bookingRouter
+  .route("/:id/status")
+  .patch(isAuthenticated, isAdmin, updateBookingStatusAdmin);
 
-
-
-// Export the router
 export default bookingRouter;

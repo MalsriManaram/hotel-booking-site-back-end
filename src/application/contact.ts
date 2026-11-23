@@ -2,6 +2,16 @@ import { Request, Response, NextFunction } from "express";
 import Contact from "../infrastructure/schemas/Contact";
 import nodemailer from "nodemailer";
 import { ContactDTO } from "../domain/dtos/contact";
+import NotFoundError from "../domain/errors/not-found-error";
+
+export function escapeHtml(str: string): string {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 function buildHtmlEmail({
   name,
@@ -12,8 +22,9 @@ function buildHtmlEmail({
   email: string;
   message: string;
 }) {
-  // Simple responsive HTML with inline styles
-  const safeMessage = message.replace(/\n/g, "<br>");
+  const safeName = escapeHtml(name);
+  const safeEmail = escapeHtml(email);
+  const safeMessage = escapeHtml(message).replace(/\n/g, "<br>");
   return `
   <!doctype html>
   <html>
@@ -32,8 +43,8 @@ function buildHtmlEmail({
                 <h1 style="margin:0 0 8px; font-size:20px;">New contact form message</h1>
                 <p style="margin:0 0 16px; color:#6b7280;">Received from your website</p>
 
-                <p style="margin:0 0 8px;"><strong>Name:</strong> ${name}</p>
-                <p style="margin:0 0 8px;"><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
+                <p style="margin:0 0 8px;"><strong>Name:</strong> ${safeName}</p>
+                <p style="margin:0 0 8px;"><strong>Email:</strong> <a href="mailto:${safeEmail}">${safeEmail}</a></p>
                 <hr style="margin:16px 0; border:none; border-top:1px solid #eef2f7;" />
                 <h3 style="margin:0 0 8px; font-size:16px;">Message</h3>
                 <div style="margin-bottom:20px; line-height:1.5; color:#111827;">${safeMessage}</div>
@@ -56,8 +67,7 @@ function buildHtmlEmail({
   `;
 }
 
-/* ---------- Helper ---------- */
-function getTransporter() {
+export function getMailTransporter() {
   if (
     process.env.SMTP_HOST &&
     process.env.SMTP_PORT &&
@@ -77,7 +87,6 @@ function getTransporter() {
     });
   }
 
-  // Gmail fallback
   if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
     return nodemailer.createTransport({
       service: "gmail",
@@ -89,66 +98,97 @@ function getTransporter() {
     });
   }
 
-  throw new Error("No mail configuration found.");
+  return null;
 }
 
-/* ---------- Controller ---------- */
 export const createContact = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    // 1) Validate payload
     const parseResult = ContactDTO.safeParse(req.body);
     if (!parseResult.success) {
-      // zod format -> readable
       const errors = parseResult.error.errors.map(
         (e) => `${e.path.join(".")}: ${e.message}`
       );
-      return res.status(400).json({ error: "Invalid input", details: errors });
+      res.status(400).json({ error: "Invalid input", details: errors });
+      return;
     }
     const { name, email, message } = parseResult.data;
 
-    // Save to DB
     const newContact = new Contact({
-      name: name,
-      email: email,
-      message: message,
+      name,
+      email,
+      message,
+      status: "unread",
       createdAt: new Date(),
     });
     await newContact.save();
 
-    // 4) Build email
-    const html = buildHtmlEmail({ name: name, email: email, message: message });
-    // Fallback text (strip tags)
-    const text = message
-      .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<\/?[^>]+(>|$)/g, "");
+    let emailSent = false;
+    const transporter = getMailTransporter();
+    if (transporter) {
+      try {
+        const html = buildHtmlEmail({ name, email, message });
+        const fromAddr = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+        await transporter.sendMail({
+          from: `"StayLux Contact" <${fromAddr}>`,
+          to: process.env.SUPPORT_EMAIL || process.env.EMAIL_USER,
+          subject: `New message from ${name} — StayLux contact form`,
+          replyTo: email,
+          text: message,
+          html,
+        });
+        emailSent = true;
+      } catch (mailErr: any) {
+        console.warn("Contact notification email failed:", mailErr?.message ?? mailErr);
+      }
+    }
 
-    // Send email
-    const transporter = getTransporter();
-
-    const mailOptions = {
-      from: `"StayLux Contact" <${process.env.EMAIL_FROM}>`,
-      to: process.env.SUPPORT_EMAIL || process.env.EMAIL_USER,
-      subject: `New message from ${name} — StayLux contact form`,
-      replyTo: email,
-      text,
-      html,
-    };
-
-    await transporter.sendMail(mailOptions);
-
-    // Respond to front-end
-    return res.status(201).json({
-      message: "Contact message saved and notification sent",
+    res.status(201).json({
+      message: emailSent
+        ? "Contact message saved and notification sent"
+        : "Contact message saved successfully",
       contactId: newContact._id,
     });
   } catch (err: any) {
-    // handle known nodemailer errors gracefully
     console.error("createContact error:", err?.message ?? err);
-    // Do not leak internal details in production
-    return next(err);
+    next(err);
+  }
+};
+
+export const getAllContacts = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const contacts = await Contact.find().sort({ createdAt: -1 });
+    res.status(200).json({ contacts });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateContactStatus = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const updated = await Contact.findByIdAndUpdate(
+      id,
+      { status: status === "resolved" ? "resolved" : "unread" },
+      { new: true }
+    );
+    if (!updated) {
+      throw new NotFoundError("Contact message not found");
+    }
+    res.status(200).json({ contact: updated });
+  } catch (error) {
+    next(error);
   }
 };
